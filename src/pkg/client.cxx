@@ -60,12 +60,12 @@ Message_Message Client::send(std::string plaintext) {
         std::get<0>(DH_Tuple),
         this->DH_current_private_value,
         this->DH_last_other_public_value
-        );
+    );
   }
   std::pair<std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
       this->AES_key,
       std::move(plaintext)
-      );
+  );
   Message_Message msg;
   msg.iv = aes.second;
   msg.public_value = this->DH_current_public_value;
@@ -73,7 +73,7 @@ Message_Message Client::send(std::string plaintext) {
   msg.mac = this->crypto_driver->HMAC_generate(
       this->HMAC_key,
       msg.ciphertext
-      );
+  );
   return msg;
 }
 
@@ -87,39 +87,35 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
   // Grab the lock to avoid race conditions between the receive and send threads
   // Lock will automatically release at the end of the function.
   std::unique_lock<std::mutex> lck(this->mtx);
-  if (this->DH_switched) {
-    this->DH_switched = false;
-  }
+  this->DH_switched = false;
+
   if (ciphertext.public_value != this->DH_last_other_public_value) {
     this->DH_last_other_public_value = ciphertext.public_value;
-    std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
-    this->DH_current_private_value = std::get<1>(DH_Tuple);
-    this->DH_current_public_value = std::get<2>(DH_Tuple);
     this->prepare_keys(
-        std::get<0>(DH_Tuple),
+        DH(
+            this->DH_params.p,
+            this->DH_params.q,
+            this->DH_params.g),
         this->DH_current_private_value,
         this->DH_last_other_public_value
     );
   }
 
-  std::pair<std::string, bool> ret;
-
   if (!this->crypto_driver->HMAC_verify(
       this->HMAC_key,
       ciphertext.ciphertext,
       ciphertext.mac
-      )) {
-    ret.first = "";
-    ret.second = false;
-    return ret;
+  )) {
+    return {"", false};
   }
-  ret.first = this->crypto_driver->AES_decrypt(
-      this->AES_key,
-      ciphertext.iv,
-      ciphertext.ciphertext
-      );
-  ret.second = true;
-  return ret;
+  return {
+      this->crypto_driver->AES_decrypt(
+          this->AES_key,
+          ciphertext.iv,
+          ciphertext.ciphertext
+      ),
+      true
+  };
 }
 
 /**
@@ -168,9 +164,7 @@ void Client::HandleKeyExchange(std::string command) {
   } else {
     throw std::runtime_error("HandleKeyExchange - Invalid Command");
   }
-  //std::cout << "Initialising DH" << std::endl;
   std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
-  //std::cout << "DH Initialised" << std::endl;
   this->DH_current_private_value = std::get<1>(DH_Tuple);
   this->DH_current_public_value = std::get<2>(DH_Tuple);
 
@@ -187,15 +181,11 @@ void Client::HandleKeyExchange(std::string command) {
   PublicValue_Message their_pub_key;
   their_pub_key.deserialize(their_pub_key_msg);
   this->DH_last_other_public_value = their_pub_key.public_value;
-
-  std::cout << "Made it here!" << std::endl;
-
   this->prepare_keys(
       std::get<0>(DH_Tuple),
       this->DH_current_private_value,
       this->DH_last_other_public_value
-      );
-  std::cout << "Key exchange complete!" << std::endl;
+  );
 }
 
 /**

@@ -40,7 +40,7 @@ CryptoDriver::DH_initialize(const DHParams_Message &DH_params) {
   SecByteBlock pubKey = SecByteBlock(dh.PublicKeyLength());
   CryptoPP::AutoSeededRandomPool asrp;
   dh.GenerateKeyPair(asrp, privKey, pubKey);
-  return { dh, privKey, pubKey };
+  return {dh, privKey, pubKey};
 }
 
 /**
@@ -78,7 +78,7 @@ SecByteBlock CryptoDriver::DH_generate_shared_key(
  */
 SecByteBlock CryptoDriver::AES_generate_key(const SecByteBlock &DH_shared_key) {
   std::string aes_salt_str("salt0000");
-  SecByteBlock aes_salt((const unsigned char *)(aes_salt_str.data()),
+  SecByteBlock aes_salt((const unsigned char *) (aes_salt_str.data()),
                         aes_salt_str.size());
   SecByteBlock key(AES::DEFAULT_KEYLENGTH);
   HKDF<SHA256> hkdf;
@@ -106,22 +106,19 @@ std::pair<std::string, SecByteBlock>
 CryptoDriver::AES_encrypt(SecByteBlock key, std::string plaintext) {
   try {
     CBC_Mode<AES>::Encryption c;
-    byte* iv = new byte[AES::BLOCKSIZE];
     CryptoPP::AutoSeededRandomPool asrp;
+    SecByteBlock iv(AES::BLOCKSIZE);
     c.GetNextIV(asrp, iv);
     c.SetKeyWithIV(key, key.size(), iv);
-    byte msg[plaintext.length()];
-    memcpy(msg, plaintext.data(), plaintext.length());
-//    msg[plaintext.length()] = '\0';
-    c.ProcessString(msg, sizeof(msg));
-    char cipher[sizeof(msg)];
-    memcpy(cipher, msg, sizeof(msg));
-
-    std::pair<std::string, SecByteBlock>ret;
-    ret.first = cipher;
-    SecByteBlock siv(iv, AES::BLOCKSIZE);
-    ret.second = siv;
-    return ret;
+    std::string ciphertext;
+    StringSource s(
+        plaintext,
+        true,
+        new StreamTransformationFilter(
+            c,
+            new StringSink(ciphertext))
+    );
+    return {ciphertext, iv};
   } catch (CryptoPP::Exception &e) {
     std::cerr << e.what() << std::endl;
     std::cerr << "This function was likely called with an incorrect shared key."
@@ -148,11 +145,14 @@ std::string CryptoDriver::AES_decrypt(SecByteBlock key, SecByteBlock iv,
   try {
     CBC_Mode<AES>::Decryption d;
     d.SetKeyWithIV(key, key.size(), iv);
-    byte msg[ciphertext.length()];
-    memcpy(msg, ciphertext.data(), ciphertext.length());
-    d.ProcessString(msg, sizeof(msg));
-    char plaintext[sizeof(msg)];
-    memcpy(plaintext, msg, sizeof(msg));
+    std::string plaintext;
+    StringSource s(
+        ciphertext,
+        true,
+        new StreamTransformationFilter(
+            d,
+            new StringSink(plaintext))
+    );
     return plaintext;
   } catch (CryptoPP::Exception &e) {
     std::cerr << e.what() << std::endl;
@@ -174,7 +174,7 @@ std::string CryptoDriver::AES_decrypt(SecByteBlock key, SecByteBlock iv,
 SecByteBlock
 CryptoDriver::HMAC_generate_key(const SecByteBlock &DH_shared_key) {
   std::string hmac_salt_str("salt0001");
-  SecByteBlock hmac_salt((const unsigned char *)(hmac_salt_str.data()),
+  SecByteBlock hmac_salt((const unsigned char *) (hmac_salt_str.data()),
                          hmac_salt_str.size());
   SecByteBlock key(SHA256::BLOCKSIZE);
   HKDF<SHA256> hkdf;
@@ -198,15 +198,15 @@ std::string CryptoDriver::HMAC_generate(SecByteBlock key,
                                         std::string ciphertext) {
   try {
     HMAC<SHA256> hmac(key);
-    byte c_byte[ciphertext.length()];
-    std::memcpy(c_byte, ciphertext.data(), ciphertext.length());
-    hmac.Update(c_byte, sizeof(c_byte));
-    byte digest[hmac.DigestSize()];
-    hmac.Final(digest);
-    char ret[sizeof(digest)];
-    memcpy(ret, digest, sizeof(digest));
-//    ret[sizeof(digest)] = '\0';
-    return ret;
+    std::string mac;
+    StringSource s(
+        ciphertext,
+        true,
+        new HashFilter(
+            hmac,
+            new StringSink(mac))
+    );
+    return mac;
   } catch (const CryptoPP::Exception &e) {
     std::cerr << e.what() << std::endl;
     throw std::runtime_error("CryptoDriver HMAC generation failed.");
@@ -228,9 +228,13 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
   const int flags = HashVerificationFilter::THROW_EXCEPTION |
                     HashVerificationFilter::HASH_AT_END;
   HMAC<SHA256> hmac(key);
-  byte c_byte[ciphertext.length()];
-  std::memcpy(c_byte, ciphertext.data(), ciphertext.length());
-  byte digest[mac.length()];
-  std::memcpy(digest, mac.data(), mac.length());
-  return hmac.VerifyDigest(digest, c_byte, sizeof(c_byte));
+  StringSource(
+      ciphertext + mac,
+      true,
+      new HashVerificationFilter(
+          hmac,
+          nullptr,
+          flags)
+  );
+  return true;
 }
