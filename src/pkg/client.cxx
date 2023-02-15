@@ -36,7 +36,9 @@ Client::Client(std::shared_ptr<NetworkDriver> network_driver,
 void Client::prepare_keys(CryptoPP::DH DH_obj,
                           CryptoPP::SecByteBlock DH_private_value,
                           CryptoPP::SecByteBlock DH_other_public_value) {
-  // TODO: implement me!
+  SecByteBlock s = this->crypto_driver->DH_generate_shared_key(DH_obj, DH_private_value, DH_other_public_value);
+  this->AES_key = this->crypto_driver->AES_generate_key(s);
+  this->HMAC_key = this->crypto_driver->HMAC_generate_key(s);
 }
 
 /**
@@ -49,8 +51,30 @@ Message_Message Client::send(std::string plaintext) {
   // Grab the lock to avoid race conditions between the receive and send threads
   // Lock will automatically release at the end of the function.
   std::unique_lock<std::mutex> lck(this->mtx);
-
-  // TODO: implement me!
+  if (!this->DH_switched) {
+    this->DH_switched = true;
+    std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
+    this->DH_current_private_value = std::get<1>(DH_Tuple);
+    this->DH_current_public_value = std::get<2>(DH_Tuple);
+    this->prepare_keys(
+        std::get<0>(DH_Tuple),
+        this->DH_current_private_value,
+        this->DH_last_other_public_value
+        );
+  }
+  std::pair<std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
+      this->AES_key,
+      plaintext
+      );
+  Message_Message msg;
+  msg.iv = aes.second;
+  msg.public_value = this->DH_current_public_value;
+  msg.ciphertext = aes.first;
+  msg.mac = this->crypto_driver->HMAC_generate(
+      this->HMAC_key,
+      msg.ciphertext
+      );
+  return msg;
 }
 
 /**
@@ -63,8 +87,39 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
   // Grab the lock to avoid race conditions between the receive and send threads
   // Lock will automatically release at the end of the function.
   std::unique_lock<std::mutex> lck(this->mtx);
+  if (this->DH_switched) {
+    this->DH_switched = false;
+  }
+  if (ciphertext.public_value != this->DH_last_other_public_value) {
+    this->DH_last_other_public_value = ciphertext.public_value;
+    std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
+    this->DH_current_private_value = std::get<1>(DH_Tuple);
+    this->DH_current_public_value = std::get<2>(DH_Tuple);
+    this->prepare_keys(
+        std::get<0>(DH_Tuple),
+        this->DH_current_private_value,
+        this->DH_last_other_public_value
+    );
+  }
 
-  // TODO: implement me!
+  std::pair<std::string, bool> ret;
+
+  if (!this->crypto_driver->HMAC_verify(
+      this->HMAC_key,
+      ciphertext.ciphertext,
+      ciphertext.mac
+      )) {
+    ret.first = "";
+    ret.second = false;
+    return ret;
+  }
+  ret.first = this->crypto_driver->AES_decrypt(
+      this->AES_key,
+      ciphertext.iv,
+      ciphertext.ciphertext
+      );
+  ret.second = true;
+  return ret;
 }
 
 /**
@@ -97,7 +152,50 @@ void Client::run(std::string command) {
  * 5) Generate DH, AES, and HMAC keys and set local variables
  */
 void Client::HandleKeyExchange(std::string command) {
-  // TODO: implement me!
+  if (std::equal(command.begin(), command.end(), "listen")) {
+    this->DH_switched = false;
+    std::vector<unsigned char> msg = this->network_driver->read();
+    if (get_message_type(msg) != MessageType::DHParams_Message) {
+      throw std::runtime_error("HandleKeyExchange - Listener Expected a DHParams_Message");
+    }
+    this->DH_params.deserialize(msg);
+  } else if (std::equal(command.begin(), command.end(), "connect")) {
+    this->DH_switched = true;
+    this->DH_params = this->crypto_driver->DH_generate_params();
+    std::vector<unsigned char> msg;
+    this->DH_params.serialize(msg);
+    this->network_driver->send(msg);
+  } else {
+    throw std::runtime_error("HandleKeyExchange - Invalid Command");
+  }
+  //std::cout << "Initialising DH" << std::endl;
+  std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
+  //std::cout << "DH Initialised" << std::endl;
+  this->DH_current_private_value = std::get<1>(DH_Tuple);
+  this->DH_current_public_value = std::get<2>(DH_Tuple);
+
+  std::vector<unsigned char> my_pub_key;
+  PublicValue_Message pub_key_msg;
+  pub_key_msg.public_value = this->DH_current_public_value;
+  pub_key_msg.serialize(my_pub_key);
+  this->network_driver->send(my_pub_key);
+
+  std::vector<unsigned char> their_pub_key_msg = this->network_driver->read();
+  if (get_message_type(their_pub_key_msg) != MessageType::PublicValue) {
+    throw std::runtime_error("HandleKeyExchange - Listener Expected a PublicValue");
+  }
+  PublicValue_Message their_pub_key;
+  their_pub_key.deserialize(their_pub_key_msg);
+  this->DH_last_other_public_value = their_pub_key.public_value;
+
+  std::cout << "Made it here!" << std::endl;
+
+  this->prepare_keys(
+      std::get<0>(DH_Tuple),
+      this->DH_current_private_value,
+      this->DH_last_other_public_value
+      );
+  std::cout << "Key exchange complete!" << std::endl;
 }
 
 /**
