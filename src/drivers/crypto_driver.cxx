@@ -38,10 +38,8 @@ CryptoDriver::DH_initialize(const DHParams_Message &DH_params) {
   DH dh = DH(DH_params.p, DH_params.q, DH_params.g);
   SecByteBlock privKey = SecByteBlock(dh.PrivateKeyLength());
   SecByteBlock pubKey = SecByteBlock(dh.PublicKeyLength());
-  //std::cout << "Generating key pair with params " << DH_params.p << "\n" << DH_params.q << "\n" << DH_params.g << std::endl;
-  CryptoPP::RandomNumberGenerator rng;
-  dh.GenerateKeyPair(rng, privKey, pubKey);
-  //std::cout << "Generated key pair!" << std::endl;
+  CryptoPP::AutoSeededRandomPool asrp;
+  dh.GenerateKeyPair(asrp, privKey, pubKey);
   return { dh, privKey, pubKey };
 }
 
@@ -109,8 +107,8 @@ CryptoDriver::AES_encrypt(SecByteBlock key, std::string plaintext) {
   try {
     CBC_Mode<AES>::Encryption c;
     byte* iv = new byte[AES::BLOCKSIZE];
-    CryptoPP::RandomNumberGenerator rng;
-    c.GetNextIV(rng, iv);
+    CryptoPP::AutoSeededRandomPool asrp;
+    c.GetNextIV(asrp, iv);
     c.SetKeyWithIV(key, key.size(), iv);
     byte msg[plaintext.length() + 1];
     memcpy(msg, plaintext.data(), plaintext.length());

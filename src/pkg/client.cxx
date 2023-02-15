@@ -64,7 +64,7 @@ Message_Message Client::send(std::string plaintext) {
   }
   std::pair<std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
       this->AES_key,
-      plaintext
+      std::move(plaintext)
       );
   Message_Message msg;
   msg.iv = aes.second;
