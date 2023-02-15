@@ -72,7 +72,10 @@ Message_Message Client::send(std::string plaintext) {
   msg.ciphertext = aes.first;
   msg.mac = this->crypto_driver->HMAC_generate(
       this->HMAC_key,
-      concat_msg_fields(msg.iv, this->DH_current_public_value, msg.ciphertext)
+      concat_msg_fields(
+          msg.iv,
+          this->DH_current_public_value,
+          msg.ciphertext)
   );
   return msg;
 }

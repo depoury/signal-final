@@ -197,7 +197,7 @@ CryptoDriver::HMAC_generate_key(const SecByteBlock &DH_shared_key) {
 std::string CryptoDriver::HMAC_generate(SecByteBlock key,
                                         std::string ciphertext) {
   try {
-    HMAC<SHA256> hmac(key);
+    HMAC<SHA256> hmac(key, key.size());
     std::string mac;
     StringSource _(
         ciphertext,
@@ -228,7 +228,7 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
   const int flags = HashVerificationFilter::THROW_EXCEPTION |
                     HashVerificationFilter::HASH_AT_END;
   try {
-    HMAC<SHA256> hmac(key);
+    HMAC<SHA256> hmac(key, key.size());
     StringSource _(
         ciphertext + mac,
         true,
