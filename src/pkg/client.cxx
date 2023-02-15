@@ -101,11 +101,16 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
     );
   }
 
-  this->crypto_driver->HMAC_verify(
-      this->HMAC_key,
-      ciphertext.ciphertext,
-      ciphertext.mac
-  );
+  bool verified = true;
+  try {
+    this->crypto_driver->HMAC_verify(
+        this->HMAC_key,
+        ciphertext.ciphertext,
+        ciphertext.mac
+    );
+  } catch (std::runtime_error &e) {
+    verified = false;
+  }
 
   return {
       this->crypto_driver->AES_decrypt(
@@ -113,7 +118,7 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
           ciphertext.iv,
           ciphertext.ciphertext
       ),
-      true
+      verified
   };
 }
 

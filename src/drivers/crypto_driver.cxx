@@ -227,14 +227,19 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
                                std::string mac) {
   const int flags = HashVerificationFilter::THROW_EXCEPTION |
                     HashVerificationFilter::HASH_AT_END;
-  HMAC<SHA256> hmac(key);
-  StringSource(
-      ciphertext + mac,
-      true,
-      new HashVerificationFilter(
-          hmac,
-          nullptr,
-          flags)
-  );
+  try {
+    HMAC<SHA256> hmac(key);
+    StringSource(
+        ciphertext + mac,
+        true,
+        new HashVerificationFilter(
+            hmac,
+            nullptr,
+            flags)
+    );
+  } catch (const CryptoPP::Exception &e) {
+    std::cerr << e.what() << std::endl;
+    throw std::runtime_error("CryptoDriver HMAC verification failed.");
+  }
   return true;
 }
