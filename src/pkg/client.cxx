@@ -101,13 +101,12 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
     );
   }
 
-  if (!this->crypto_driver->HMAC_verify(
+  this->crypto_driver->HMAC_verify(
       this->HMAC_key,
       ciphertext.ciphertext,
       ciphertext.mac
-  )) {
-    return {"", false};
-  }
+  );
+
   return {
       this->crypto_driver->AES_decrypt(
           this->AES_key,
