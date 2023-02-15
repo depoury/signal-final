@@ -111,7 +111,7 @@ CryptoDriver::AES_encrypt(SecByteBlock key, std::string plaintext) {
     c.GetNextIV(asrp, iv);
     c.SetKeyWithIV(key, key.size(), iv);
     std::string ciphertext;
-    StringSource s(
+    StringSource _(
         plaintext,
         true,
         new StreamTransformationFilter(
@@ -146,7 +146,7 @@ std::string CryptoDriver::AES_decrypt(SecByteBlock key, SecByteBlock iv,
     CBC_Mode<AES>::Decryption d;
     d.SetKeyWithIV(key, key.size(), iv);
     std::string plaintext;
-    StringSource s(
+    StringSource _(
         ciphertext,
         true,
         new StreamTransformationFilter(
@@ -199,7 +199,7 @@ std::string CryptoDriver::HMAC_generate(SecByteBlock key,
   try {
     HMAC<SHA256> hmac(key);
     std::string mac;
-    StringSource s(
+    StringSource _(
         ciphertext,
         true,
         new HashFilter(
@@ -229,7 +229,7 @@ bool CryptoDriver::HMAC_verify(SecByteBlock key, std::string ciphertext,
                     HashVerificationFilter::HASH_AT_END;
   try {
     HMAC<SHA256> hmac(key);
-    StringSource(
+    StringSource _(
         ciphertext + mac,
         true,
         new HashVerificationFilter(

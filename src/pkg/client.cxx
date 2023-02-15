@@ -72,7 +72,7 @@ Message_Message Client::send(std::string plaintext) {
   msg.ciphertext = aes.first;
   msg.mac = this->crypto_driver->HMAC_generate(
       this->HMAC_key,
-      msg.ciphertext
+      concat_msg_fields(msg.iv, this->DH_current_public_value, msg.ciphertext)
   );
   return msg;
 }
@@ -105,7 +105,10 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
   try {
     this->crypto_driver->HMAC_verify(
         this->HMAC_key,
-        ciphertext.ciphertext,
+        concat_msg_fields(
+            ciphertext.iv,
+            this->DH_last_other_public_value,
+            ciphertext.ciphertext),
         ciphertext.mac
     );
   } catch (std::runtime_error &e) {
