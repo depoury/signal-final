@@ -110,9 +110,9 @@ CryptoDriver::AES_encrypt(SecByteBlock key, std::string plaintext) {
     CryptoPP::AutoSeededRandomPool asrp;
     c.GetNextIV(asrp, iv);
     c.SetKeyWithIV(key, key.size(), iv);
-    byte msg[plaintext.length() + 1];
+    byte msg[plaintext.length()];
     memcpy(msg, plaintext.data(), plaintext.length());
-    msg[plaintext.length()] = '\0';
+//    msg[plaintext.length()] = '\0';
     c.ProcessString(msg, sizeof(msg));
     char cipher[sizeof(msg)];
     memcpy(cipher, msg, sizeof(msg));
@@ -203,9 +203,9 @@ std::string CryptoDriver::HMAC_generate(SecByteBlock key,
     hmac.Update(c_byte, sizeof(c_byte));
     byte digest[hmac.DigestSize()];
     hmac.Final(digest);
-    char ret[sizeof(digest) + 1];
+    char ret[sizeof(digest)];
     memcpy(ret, digest, sizeof(digest));
-    ret[sizeof(digest)] = '\0';
+//    ret[sizeof(digest)] = '\0';
     return ret;
   } catch (const CryptoPP::Exception &e) {
     std::cerr << e.what() << std::endl;
