@@ -13,6 +13,8 @@
 #include "../../include-shared/util.hpp"
 #include "colors.hpp"
 
+std::vector<Message_Message> hold_up = {};
+
 /**
  * Constructor. Sets up TCP socket and starts REPL
  * @param command One of "listen" or "connect"
@@ -308,6 +310,17 @@ void Client::SendThread() {
     // Encrypt and send message.
     if (plaintext != "") {
       Message_Message msg = this->send(plaintext);
+      if (plaintext.find("TEST") != std::string::npos) {
+        hold_up.push_back(msg);
+        this->cli_driver->print_left("FAILED SEND");
+      } else {
+        std::vector<unsigned char> data;
+        msg.serialize(data);
+        this->network_driver->send(data);
+      }
+    } else if (!hold_up.empty()){
+      Message_Message msg = hold_up.back();
+      hold_up.pop_back();
       std::vector<unsigned char> data;
       msg.serialize(data);
       this->network_driver->send(data);
