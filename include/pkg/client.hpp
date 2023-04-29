@@ -40,11 +40,11 @@ private:
   std::shared_ptr<CryptoDriver> crypto_driver;
   std::shared_ptr<NetworkDriver> network_driver;
 
-  size_t message_id;
-  size_t pn;
-  size_t n;
+  CryptoPP::Integer message_id;
+  CryptoPP::Integer pn;
+  CryptoPP::Integer n;
 
-  std::map<size_t, std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>> saved_keys;
+  std::map<CryptoPP::Integer, std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>> saved_keys;
 
   SecByteBlock CHAIN_key;
   SecByteBlock AES_key;

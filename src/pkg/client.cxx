@@ -25,9 +25,9 @@ Client::Client(std::shared_ptr<NetworkDriver> network_driver,
   this->cli_driver = std::make_shared<CLIDriver>();
   this->crypto_driver = crypto_driver;
   this->network_driver = network_driver;
-  this->message_id = 0;
-  this->pn = 0;
-  this->n = 0;
+  this->message_id = CryptoPP::Integer::Zero();
+  this->pn = CryptoPP::Integer::Zero();
+  this->n = CryptoPP::Integer::Zero();
   this->saved_keys = {};
 }
 
@@ -65,7 +65,7 @@ Message_Message Client::send(std::string plaintext) {
   if (!this->DH_switched) {
     this->DH_switched = true;
     this->pn = this->n;
-    this->n = 0;
+    this->n = CryptoPP::Integer::Zero();
     std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
     this->DH_current_private_value = std::get<1>(DH_Tuple);
     this->DH_current_public_value = std::get<2>(DH_Tuple);
@@ -108,7 +108,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
   this->DH_switched = false;
 
   if (ciphertext.public_value != this->DH_last_other_public_value) {
-    for (size_t i = 0; i < ciphertext.previous_chain_length - this->n; i++) {
+    for (CryptoPP::Integer i = CryptoPP::Integer::Zero(); i < ciphertext.previous_chain_length - this->n; i++) {
       this->UpdateAESKey();
       this->saved_keys.emplace(
           this->message_id,
@@ -128,8 +128,8 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
         this->DH_last_other_public_value
     );
     this->pn = this->n;
-    this->n = 0;
-    for (size_t i = 0; i < ciphertext.number; i++) {
+    this->n = CryptoPP::Integer::Zero();
+    for (CryptoPP::Integer i = CryptoPP::Integer::Zero(); i < ciphertext.number; i++) {
       this->UpdateAESKey();
       this->saved_keys.emplace(
           this->message_id,
@@ -140,8 +140,8 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
           ));
     }
   }
-  for (size_t i = 0; i < ciphertext.number - this->n; i++) {
-    this->UpdateAESKey();
+  this->UpdateAESKey();
+  while(this->n < ciphertext.number) {
     this->saved_keys.emplace(
         this->message_id,
         std::tie(
@@ -149,19 +149,20 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
             this->HMAC_key,
             this->DH_last_other_public_value
         ));
+    this->UpdateAESKey();
   }
 
   SecByteBlock AES_key_to_use;
   SecByteBlock HMAC_key_to_use;
   SecByteBlock DH_key_to_use;
-  if (ciphertext.uuid <= this->message_id) {
+  if (ciphertext.uuid < this->message_id) {
     // This must be an out-of-order message
     std::tie(
         AES_key_to_use,
         HMAC_key_to_use,
         DH_key_to_use) = this->saved_keys[ciphertext.uuid];
+    this->saved_keys.erase(ciphertext.uuid);
   } else {
-    this->UpdateAESKey();
     AES_key_to_use = this->AES_key;
     HMAC_key_to_use = this->HMAC_key;
     DH_key_to_use = this->DH_last_other_public_value;
