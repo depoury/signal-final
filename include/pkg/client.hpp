@@ -25,13 +25,14 @@ public:
                     CryptoPP::SecByteBlock DH_private_value,
                     CryptoPP::SecByteBlock DH_other_public_value);
   Message_Message send(std::string plaintext);
-  std::pair<std::string, bool> receive(Message_Message ciphertext);
+  std::pair<std::string, bool> receive(const Message_Message& ciphertext);
   void run(std::string command);
   void HandleKeyExchange(std::string command);
 
 private:
   void ReceiveThread();
   void SendThread();
+  void UpdateAESKey();
 
   std::mutex mtx;
 
@@ -39,6 +40,13 @@ private:
   std::shared_ptr<CryptoDriver> crypto_driver;
   std::shared_ptr<NetworkDriver> network_driver;
 
+  size_t message_id;
+  size_t pn;
+  size_t n;
+
+  std::map<size_t, std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>> saved_keys;
+
+  SecByteBlock CHAIN_key;
   SecByteBlock AES_key;
   SecByteBlock HMAC_key;
 

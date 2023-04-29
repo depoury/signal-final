@@ -25,6 +25,17 @@ Client::Client(std::shared_ptr<NetworkDriver> network_driver,
   this->cli_driver = std::make_shared<CLIDriver>();
   this->crypto_driver = crypto_driver;
   this->network_driver = network_driver;
+  this->message_id = 0;
+  this->pn = 0;
+  this->n = 0;
+  this->saved_keys = {};
+}
+
+void Client::UpdateAESKey() {
+  this->AES_key = this->crypto_driver->AES_generate_key(this->CHAIN_key);
+  this->CHAIN_key = this->crypto_driver->CHAIN_generate_key(this->CHAIN_key);
+  this->message_id++;
+  this->n++;
 }
 
 /**
@@ -37,7 +48,7 @@ void Client::prepare_keys(CryptoPP::DH DH_obj,
                           CryptoPP::SecByteBlock DH_private_value,
                           CryptoPP::SecByteBlock DH_other_public_value) {
   SecByteBlock s = this->crypto_driver->DH_generate_shared_key(DH_obj, DH_private_value, DH_other_public_value);
-  this->AES_key = this->crypto_driver->AES_generate_key(s);
+  this->CHAIN_key = this->crypto_driver->CHAIN_generate_key(s);
   this->HMAC_key = this->crypto_driver->HMAC_generate_key(s);
 }
 
@@ -53,6 +64,8 @@ Message_Message Client::send(std::string plaintext) {
   std::unique_lock<std::mutex> lck(this->mtx);
   if (!this->DH_switched) {
     this->DH_switched = true;
+    this->pn = this->n;
+    this->n = 0;
     std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
     this->DH_current_private_value = std::get<1>(DH_Tuple);
     this->DH_current_public_value = std::get<2>(DH_Tuple);
@@ -62,6 +75,7 @@ Message_Message Client::send(std::string plaintext) {
         this->DH_last_other_public_value
     );
   }
+  this->UpdateAESKey();
   std::pair<std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
       this->AES_key,
       std::move(plaintext)
@@ -69,6 +83,9 @@ Message_Message Client::send(std::string plaintext) {
   Message_Message msg;
   msg.iv = aes.second;
   msg.public_value = this->DH_current_public_value;
+  msg.uuid = this->message_id;
+  msg.number = this->n;
+  msg.previous_chain_length = this->pn;
   msg.ciphertext = aes.first;
   msg.mac = this->crypto_driver->HMAC_generate(
       this->HMAC_key,
@@ -86,13 +103,21 @@ Message_Message Client::send(std::string plaintext) {
  * 1) Check if the DH Ratchet keys need to change; if so, update them.
  * 2) Decrypt and verify the message.
  */
-std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
-  // Grab the lock to avoid race conditions between the receive and send threads
-  // Lock will automatically release at the end of the function.
+std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) {
   std::unique_lock<std::mutex> lck(this->mtx);
   this->DH_switched = false;
 
   if (ciphertext.public_value != this->DH_last_other_public_value) {
+    for (size_t i = 0; i < ciphertext.previous_chain_length - this->n; i++) {
+      this->UpdateAESKey();
+      this->saved_keys.emplace(
+          this->message_id,
+          std::tie(
+            this->AES_key,
+            this->HMAC_key,
+            this->DH_last_other_public_value
+          ));
+    }
     this->DH_last_other_public_value = ciphertext.public_value;
     this->prepare_keys(
         DH(
@@ -102,15 +127,53 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
         this->DH_current_private_value,
         this->DH_last_other_public_value
     );
+    this->pn = this->n;
+    this->n = 0;
+    for (size_t i = 0; i < ciphertext.number; i++) {
+      this->UpdateAESKey();
+      this->saved_keys.emplace(
+          this->message_id,
+          std::tie(
+              this->AES_key,
+              this->HMAC_key,
+              this->DH_last_other_public_value
+          ));
+    }
+  }
+  for (size_t i = 0; i < ciphertext.number - this->n; i++) {
+    this->UpdateAESKey();
+    this->saved_keys.emplace(
+        this->message_id,
+        std::tie(
+            this->AES_key,
+            this->HMAC_key,
+            this->DH_last_other_public_value
+        ));
+  }
+
+  SecByteBlock AES_key_to_use;
+  SecByteBlock HMAC_key_to_use;
+  SecByteBlock DH_key_to_use;
+  if (ciphertext.uuid <= this->message_id) {
+    // This must be an out-of-order message
+    std::tie(
+        AES_key_to_use,
+        HMAC_key_to_use,
+        DH_key_to_use) = this->saved_keys[ciphertext.uuid];
+  } else {
+    this->UpdateAESKey();
+    AES_key_to_use = this->AES_key;
+    HMAC_key_to_use = this->HMAC_key;
+    DH_key_to_use = this->DH_last_other_public_value;
   }
 
   bool verified = true;
   try {
     this->crypto_driver->HMAC_verify(
-        this->HMAC_key,
+        HMAC_key_to_use,
         concat_msg_fields(
             ciphertext.iv,
-            this->DH_last_other_public_value,
+            DH_key_to_use,
             ciphertext.ciphertext),
         ciphertext.mac
     );
@@ -120,7 +183,7 @@ std::pair<std::string, bool> Client::receive(Message_Message ciphertext) {
 
   return {
       this->crypto_driver->AES_decrypt(
-          this->AES_key,
+          AES_key_to_use,
           ciphertext.iv,
           ciphertext.ciphertext
       ),

@@ -68,7 +68,25 @@ SecByteBlock CryptoDriver::DH_generate_shared_key(
 }
 
 /**
- * @brief Generates AES key using HKDR with a salt. This function should
+ * @brief Generates CHAIN key using HKDR with a salt.
+ * @param Old_CHAIN_key The current chain key
+ * @return CHAIN key
+ */
+SecByteBlock CryptoDriver::CHAIN_generate_key(const SecByteBlock &Old_CHAIN_key) {
+  std::string chain_salt_str("chain000");
+  SecByteBlock chain_salt((const unsigned char *) (chain_salt_str.data()),
+                          chain_salt_str.size());
+  SecByteBlock key(Old_CHAIN_key.size());
+  HKDF<SHA256> hkdf;
+  assert(hkdf.DeriveKey(key, key.size(),
+                        Old_CHAIN_key, Old_CHAIN_key.size(),
+                        chain_salt, chain_salt.size(),
+                        nullptr, 0) > 0);
+  return key;
+}
+
+/**
+ * @brief Updates Chain key using HKDR with a salt. This function should
  * 1) Allocate a `SecByteBlock` of size `AES::DEFAULT_KEYLENGTH`.
  * 2) Use a `HKDF<SHA256>` to derive and return a key for AES using the provided
  * salt. See the `DeriveKey` function.
@@ -76,14 +94,14 @@ SecByteBlock CryptoDriver::DH_generate_shared_key(
  * @param DH_shared_key Diffie-Hellman shared key
  * @return AES key
  */
-SecByteBlock CryptoDriver::AES_generate_key(const SecByteBlock &DH_shared_key) {
+SecByteBlock CryptoDriver::AES_generate_key(const SecByteBlock &CHAIN_key) {
   std::string aes_salt_str("salt0000");
   SecByteBlock aes_salt((const unsigned char *) (aes_salt_str.data()),
                         aes_salt_str.size());
   SecByteBlock key(AES::DEFAULT_KEYLENGTH);
   HKDF<SHA256> hkdf;
   assert(hkdf.DeriveKey(key, key.size(),
-                        DH_shared_key, DH_shared_key.size(),
+                        CHAIN_key, CHAIN_key.size(),
                         aes_salt, aes_salt.size(),
                         nullptr, 0) > 0);
   return key;
