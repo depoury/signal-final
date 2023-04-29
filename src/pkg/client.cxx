@@ -108,7 +108,7 @@ Message_Message Client::send(std::string plaintext) {
 std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) {
   std::unique_lock<std::mutex> lck(this->mtx);
   this->DH_switched = false;
-
+  this->cli_driver->print_info("Received msg: " + std::to_string(ciphertext.uuid.ConvertToLong()));
   if (ciphertext.public_value != this->DH_last_other_public_value) {
     for (CryptoPP::Integer i = CryptoPP::Integer::Zero(); i < ciphertext.previous_chain_length - this->n; i++) {
       this->UpdateAESKey();
@@ -131,29 +131,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
     );
     this->pn = this->n;
     this->n = CryptoPP::Integer::Zero();
-    for (CryptoPP::Integer i = CryptoPP::Integer::Zero(); i < ciphertext.number; i++) {
-      this->UpdateAESKey();
-      this->saved_keys.emplace(
-          this->message_id,
-          std::tie(
-              this->AES_key,
-              this->HMAC_key,
-              this->DH_last_other_public_value
-          ));
-    }
   }
-  this->UpdateAESKey();
-  while(this->n < ciphertext.number) {
-    this->saved_keys.emplace(
-        this->message_id,
-        std::tie(
-            this->AES_key,
-            this->HMAC_key,
-            this->DH_last_other_public_value
-        ));
-    this->UpdateAESKey();
-  }
-
   SecByteBlock AES_key_to_use;
   SecByteBlock HMAC_key_to_use;
   SecByteBlock DH_key_to_use;
@@ -165,6 +143,17 @@ std::pair<std::string, bool> Client::receive(const Message_Message& ciphertext) 
         DH_key_to_use) = this->saved_keys[ciphertext.uuid];
     this->saved_keys.erase(ciphertext.uuid);
   } else {
+    this->UpdateAESKey();
+    while(this->n < ciphertext.number) {
+      this->saved_keys.emplace(
+          this->message_id,
+          std::tie(
+              this->AES_key,
+              this->HMAC_key,
+              this->DH_last_other_public_value
+          ));
+      this->UpdateAESKey();
+    }
     AES_key_to_use = this->AES_key;
     HMAC_key_to_use = this->HMAC_key;
     DH_key_to_use = this->DH_last_other_public_value;
@@ -312,10 +301,11 @@ void Client::SendThread() {
       Message_Message msg = this->send(plaintext);
       if (plaintext.find("TEST") != std::string::npos) {
         hold_up.push_back(msg);
-        this->cli_driver->print_left("FAILED SEND");
+        this->cli_driver->print_info("FAILED msg: " + std::to_string(msg.uuid.ConvertToLong()));
       } else {
         std::vector<unsigned char> data;
         msg.serialize(data);
+        this->cli_driver->print_info("SEND msg: " + std::to_string(msg.uuid.ConvertToLong()));
         this->network_driver->send(data);
       }
     } else if (!hold_up.empty()){
@@ -323,6 +313,7 @@ void Client::SendThread() {
       hold_up.pop_back();
       std::vector<unsigned char> data;
       msg.serialize(data);
+      this->cli_driver->print_info("RESEND msg: " + std::to_string(msg.uuid.ConvertToLong()));
       this->network_driver->send(data);
     }
     this->cli_driver->print_right(plaintext);
