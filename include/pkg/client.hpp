@@ -17,43 +17,65 @@
 #include "../../include/drivers/crypto_driver.hpp"
 #include "../../include/drivers/network_driver.hpp"
 
-class Client {
+struct Client_Ratchet_State
+{
+    SecByteBlock ROOT_key;
+    SecByteBlock send_CHAIN_key;
+    SecByteBlock recv_CHAIN_key;
+    CryptoPP::Integer Ns;
+    CryptoPP::Integer Nr;
+};
+
+class Client
+{
 public:
-  Client(std::shared_ptr<NetworkDriver> network_driver,
-         std::shared_ptr<CryptoDriver> crypto_driver);
-  void prepare_keys(CryptoPP::DH DH_obj,
-                    CryptoPP::SecByteBlock DH_private_value,
-                    CryptoPP::SecByteBlock DH_other_public_value);
-  Message_Message send(std::string plaintext);
-  std::pair<std::string, bool> receive(const Message_Message& ciphertext);
-  void run(std::string command);
-  void HandleKeyExchange(std::string command);
+    Client(std::shared_ptr<NetworkDriver> network_driver,
+           std::shared_ptr<CryptoDriver> crypto_driver);
+    void prepare_keys(CryptoPP::DH DH_obj,
+                      CryptoPP::SecByteBlock DH_private_value,
+                      CryptoPP::SecByteBlock DH_other_public_value,
+                      bool send);
+    Message_Message send(std::string plaintext);
+    std::pair<std::string, bool> receive(const Message_Message &ciphertext);
+    void run(std::string command);
+    void HandleKeyExchange(std::string command);
 
 private:
-  void ReceiveThread();
-  void SendThread();
-  void UpdateAESKey();
+    void ReceiveThread();
+    void SendThread();
+    void UpdateAESKey(bool send);
 
-  std::mutex mtx;
+    // wrapper
+    void SerializeSend(Serializable *msg);
+    Client_Ratchet_State state;
 
-  std::shared_ptr<CLIDriver> cli_driver;
-  std::shared_ptr<CryptoDriver> crypto_driver;
-  std::shared_ptr<NetworkDriver> network_driver;
+    std::mutex mtx;
 
-  CryptoPP::Integer message_id;
-  CryptoPP::Integer pn;
-  CryptoPP::Integer n;
+    std::shared_ptr<CLIDriver> cli_driver;
+    std::shared_ptr<CryptoDriver> crypto_driver;
+    std::shared_ptr<NetworkDriver> network_driver;
 
-  std::map<CryptoPP::Integer, std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>> saved_keys;
+    CryptoPP::Integer message_id;
+    CryptoPP::Integer pn;
+    CryptoPP::Integer n;
+    CryptoPP::Integer recv_n;
 
-  SecByteBlock CHAIN_key;
-  SecByteBlock AES_key;
-  SecByteBlock HMAC_key;
+    std::map<std::pair<CryptoPP::Integer, CryptoPP::Integer>, std::tuple<SecByteBlock, SecByteBlock>> saved_keys;
 
-  // DH Ratchet Fields
-  DHParams_Message DH_params;
-  bool DH_switched;
-  SecByteBlock DH_current_private_value;
-  SecByteBlock DH_current_public_value;
-  SecByteBlock DH_last_other_public_value;
+    SecByteBlock CHAIN_key;
+    SecByteBlock Send_AES_key;
+    SecByteBlock Recv_AES_key;
+    SecByteBlock HMAC_key;
+
+    // DH Ratchet Fields
+    DHParams_Message DH_params;
+    bool DH_switched;
+    SecByteBlock DH_current_private_value;
+    SecByteBlock DH_current_public_value;
+    SecByteBlock DH_last_other_public_value;
+    SecByteBlock DH_prev_other_public_value;
+
+    SecByteBlock RK_DH_remote_public;
+    SecByteBlock RK_DH_public;
+    SecByteBlock RK_DH_private;
 };
