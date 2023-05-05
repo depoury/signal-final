@@ -44,6 +44,10 @@ void Client::prepare_keys(CryptoPP::DH DH_obj,
   if (send) {
     this->state.CKs = this->crypto_driver->CHAIN_generate_key(this->state.RK);
     this->state.HMACs = this->crypto_driver->HMAC_generate_key(s);
+    if (this->state.HMACr.empty()) {
+      // Edge case of connector sending first
+      this->state.HMACr = this->crypto_driver->HMAC_generate_key(s);
+    }
   } else {
     this->state.CKr = this->crypto_driver->CHAIN_generate_key(this->state.RK);
     this->state.HMACr = this->crypto_driver->HMAC_generate_key(s);
@@ -103,6 +107,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   bool located = false;
   if (this->state.MKSKIPPED.count(ciphertext.number)) {
     this->cli_driver->print_info("Searching historic keys");
+    this->cli_driver->print_info(std::to_string(ciphertext.number.ConvertToLong()));
     for (auto mem : this->state.MKSKIPPED[ciphertext.number]) {
       if (std::get<0>(mem) == ciphertext.public_value) {
         this->cli_driver->print_info("Found historic key");
@@ -119,15 +124,15 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
     // check if there are missed messages
     while (this->state.Nr < ciphertext.previous_chain_length) {
       this->cli_driver->print_info("Storing historic key");
-      SecByteBlock mk = this->crypto_driver->AES_generate_key(this->state.CKr);
-      this->state.CKr = this->crypto_driver->CHAIN_update_key(
-          this->state.CKr, this->state.RK);
+      this->cli_driver->print_info(std::to_string(this->state.Nr.ConvertToLong()));
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
               this->DH_last_other_public_value,
-              mk,
+              this->crypto_driver->AES_generate_key(this->state.CKr),
               this->state.HMACr
               ));
+      this->state.CKr = this->crypto_driver->CHAIN_update_key(
+          this->state.CKr, this->state.RK);
     }
 
     this->state.PN = this->state.Ns;
@@ -142,19 +147,19 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
         this->DH_current_private_value,
         this->DH_last_other_public_value, false);
   }
+
   if (!located) {
     this->cli_driver->print_info("SYMMETRIC RATCHET!");
     while (this->state.Nr < ciphertext.number) {
       this->cli_driver->print_info("Storing new historic keys");
-      SecByteBlock mk = this->crypto_driver->AES_generate_key(this->state.CKr);
-      this->state.CKr = this->crypto_driver->CHAIN_update_key(
-          this->state.CKr, this->state.RK);
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
               this->DH_last_other_public_value,
-              mk,
+              this->crypto_driver->AES_generate_key(this->state.CKr),
               this->state.HMACr
           ));
+      this->state.CKr = this->crypto_driver->CHAIN_update_key(
+          this->state.CKr, this->state.RK);
     }
     AES_key_to_use = this->crypto_driver->AES_generate_key(this->state.CKr);
     HMAC_key_to_use = this->state.HMACr;
@@ -176,6 +181,8 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
     this->cli_driver->print_info("HMAC verified failed");
     verified = false;
   }
+
+  this->cli_driver->print_info("HMAC VERIFIED " + std::to_string(verified));
 
   return {
       this->crypto_driver->AES_decrypt(
