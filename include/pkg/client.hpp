@@ -17,17 +17,21 @@
 #include "../../include/drivers/crypto_driver.hpp"
 #include "../../include/drivers/network_driver.hpp"
 
-struct Client_Ratchet_State
-{
-    SecByteBlock DHs;
-    SecByteBlock DHr;
+struct Client_Ratchet_State {
+public:
+    Client_Ratchet_State() {
+      this->Ns = CryptoPP::Integer::Zero();
+      this->Nr = CryptoPP::Integer::Zero();
+      this->PN = CryptoPP::Integer::Zero();
+      this->MKSKIPPED = {};
+    }
     SecByteBlock RK;
     SecByteBlock CKs;
     SecByteBlock CKr;
     CryptoPP::Integer Ns;
     CryptoPP::Integer Nr;
     CryptoPP::Integer PN;
-    std::map<std::pair<SecByteBlock, CryptoPP::Integer>, SecByteBlock> MKSKIPPED;
+    std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
 };
 
 class Client
@@ -47,7 +51,6 @@ public:
 private:
     void ReceiveThread();
     void SendThread();
-    void UpdateAESKey(bool send);
 
     // wrapper
     void SerializeSend(Serializable *msg);
@@ -66,5 +69,4 @@ private:
     SecByteBlock DH_current_private_value;
     SecByteBlock DH_current_public_value;
     SecByteBlock DH_last_other_public_value;
-    SecByteBlock DH_prev_other_public_value;
 };
