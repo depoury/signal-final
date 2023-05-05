@@ -28,11 +28,6 @@ Client::Client(std::shared_ptr<NetworkDriver> network_driver,
     this->cli_driver = std::make_shared<CLIDriver>();
     this->crypto_driver = crypto_driver;
     this->network_driver = network_driver;
-    this->message_id = CryptoPP::Integer::Zero(); // We are not allowed to use this right?
-    this->pn = CryptoPP::Integer::Zero();  // number in prev sending chain
-    this->n = CryptoPP::Integer::Zero();  // number in current sending chain
-    this->recv_n = CryptoPP::Integer::Zero(); // number of current receiving chain
-    this->saved_keys = {};
 }
 
 void Client::UpdateAESKey(bool send)
@@ -41,7 +36,6 @@ void Client::UpdateAESKey(bool send)
         this->Send_AES_key = this->crypto_driver->AES_generate_key(this->state.send_CHAIN_key);
         this->state.send_CHAIN_key = this->crypto_driver->CHAIN_update_key(this->state.send_CHAIN_key, 
                                                                              this->state.ROOT_key);
-        this->message_id++;
         this->n++; // update sending chain length
     } else {
         this->Recv_AES_key = this->crypto_driver->AES_generate_key(this->state.recv_CHAIN_key);
@@ -84,16 +78,20 @@ Message_Message Client::send(std::string plaintext)
     std::unique_lock<std::mutex> lck(this->mtx);
     if (!this->DH_switched)
     {
-        this->DH_switched = true;
-        this->pn = this->n;
-        this->n = CryptoPP::Integer::Zero();
-        std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
-        this->DH_current_private_value = std::get<1>(DH_Tuple);
-        this->DH_current_public_value = std::get<2>(DH_Tuple);
-        this->prepare_keys(
-            std::get<0>(DH_Tuple),
-            this->DH_current_private_value,
-            this->DH_last_other_public_value, true);
+      this->cli_driver->print_info("Send -> DH RATCHET");
+      this->cli_driver->print_info(std::to_string(this->n.ConvertToLong()));
+      this->cli_driver->print_info(std::to_string(this->recv_n.ConvertToLong()));
+      this->cli_driver->print_info("Send -> DH RATCHET -> End");
+      this->DH_switched = true;
+      this->pn = this->n;
+      this->n = CryptoPP::Integer::Zero();
+      std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
+      this->DH_current_private_value = std::get<1>(DH_Tuple);
+      this->DH_current_public_value = std::get<2>(DH_Tuple);
+      this->prepare_keys(
+          std::get<0>(DH_Tuple),
+          this->DH_current_private_value,
+          this->DH_last_other_public_value, true);
     }
     this->UpdateAESKey(true); // update send key
     std::pair<std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
@@ -102,8 +100,7 @@ Message_Message Client::send(std::string plaintext)
     Message_Message msg;
     msg.iv = aes.second;
     msg.public_value = this->DH_current_public_value;
-    msg.uuid = this->message_id;
-    msg.number = this->n-1; // we always add 1 to n in UpdateAESKey, but the actual number should start from 0?
+    msg.number = this->n - 1;
     msg.previous_chain_length = this->pn;
     msg.ciphertext = aes.first;
     msg.mac = this->crypto_driver->HMAC_generate(
@@ -125,14 +122,18 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
 {
     std::unique_lock<std::mutex> lck(this->mtx);
     this->DH_switched = false;
-    this->cli_driver->print_info("Received msg: " + std::to_string(ciphertext.uuid.ConvertToLong()));
 
     // if DH ratchet key changed, need to update receive CHAIN key
     if (ciphertext.public_value != this->DH_last_other_public_value && ciphertext.public_value != this->DH_prev_other_public_value)
-    {   
+    {
+        this->cli_driver->print_info("Receive -> DH RATCHET");
+        this->cli_driver->print_info(std::to_string(this->recv_n.ConvertToLong()));
+        this->cli_driver->print_info(std::to_string(ciphertext.previous_chain_length.ConvertToLong()));
         // check if there are missed messages
         if (this->recv_n < ciphertext.previous_chain_length)
             this->cli_driver->print_info("Missed message in prev recv chain");
+        else
+            this->cli_driver->print_info("No missed messages in prev recv chain");
         for (CryptoPP::Integer i = this->recv_n; i < ciphertext.previous_chain_length; i++)
         {   // save keys in the previous unfinished chain if any
             this->UpdateAESKey(false);
@@ -151,8 +152,10 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
                 this->DH_params.g),
             this->DH_current_private_value,
             this->DH_last_other_public_value, false);
-        // this->pn = this->n;
+        this->pn = this->n;
+        this->n = CryptoPP::Integer::Zero();
         this->recv_n = CryptoPP::Integer::Zero();
+
     }
     SecByteBlock AES_key_to_use;
     SecByteBlock HMAC_key_to_use;
@@ -357,13 +360,11 @@ void Client::SendThread()
             if (plaintext.find("TEST") != std::string::npos)
             {
                 hold_up.push_back(msg);
-                this->cli_driver->print_info("FAILED msg: " + std::to_string(msg.uuid.ConvertToLong()));
             }
             else
             {
                 std::vector<unsigned char> data;
                 msg.serialize(data);
-                this->cli_driver->print_info("SEND msg: " + std::to_string(msg.uuid.ConvertToLong()));
                 this->network_driver->send(data);
             }
         }
@@ -373,7 +374,6 @@ void Client::SendThread()
             hold_up.pop_back();
             std::vector<unsigned char> data;
             msg.serialize(data);
-            this->cli_driver->print_info("RESEND msg: " + std::to_string(msg.uuid.ConvertToLong()));
             this->network_driver->send(data);
         }
         this->cli_driver->print_right(plaintext);

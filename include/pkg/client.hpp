@@ -19,11 +19,15 @@
 
 struct Client_Ratchet_State
 {
-    SecByteBlock ROOT_key;
-    SecByteBlock send_CHAIN_key;
-    SecByteBlock recv_CHAIN_key;
+    SecByteBlock DHs;
+    SecByteBlock DHr;
+    SecByteBlock RK;
+    SecByteBlock CKs;
+    SecByteBlock CKr;
     CryptoPP::Integer Ns;
     CryptoPP::Integer Nr;
+    CryptoPP::Integer PN;
+    std::map<std::pair<SecByteBlock, CryptoPP::Integer>, SecByteBlock> MKSKIPPED;
 };
 
 class Client
@@ -54,17 +58,6 @@ private:
     std::shared_ptr<CLIDriver> cli_driver;
     std::shared_ptr<CryptoDriver> crypto_driver;
     std::shared_ptr<NetworkDriver> network_driver;
-
-    CryptoPP::Integer message_id;
-    CryptoPP::Integer pn;
-    CryptoPP::Integer n;
-    CryptoPP::Integer recv_n;
-
-    std::map<std::pair<CryptoPP::Integer, CryptoPP::Integer>, std::tuple<SecByteBlock, SecByteBlock>> saved_keys;
-
-    SecByteBlock CHAIN_key;
-    SecByteBlock Send_AES_key;
-    SecByteBlock Recv_AES_key;
     SecByteBlock HMAC_key;
 
     // DH Ratchet Fields
@@ -74,8 +67,4 @@ private:
     SecByteBlock DH_current_public_value;
     SecByteBlock DH_last_other_public_value;
     SecByteBlock DH_prev_other_public_value;
-
-    SecByteBlock RK_DH_remote_public;
-    SecByteBlock RK_DH_public;
-    SecByteBlock RK_DH_private;
 };

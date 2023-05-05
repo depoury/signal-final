@@ -136,7 +136,6 @@ void Message_Message::serialize(std::vector<unsigned char> &data) {
   put_string(iv, data);
   std::string public_integer = byteblock_to_string(this->public_value);
   put_string(public_integer, data);
-  put_integer(this->uuid, data);
   put_integer(this->previous_chain_length, data);
   put_integer(this->number, data);
   put_string(this->ciphertext, data);
@@ -158,7 +157,6 @@ int Message_Message::deserialize(std::vector<unsigned char> &data) {
   std::string public_integer;
   n += get_string(&public_integer, data, n);
   this->public_value = string_to_byteblock(public_integer);
-  n += get_integer(&this->uuid, data, n);
   n += get_integer(&this->previous_chain_length, data, n);
   n += get_integer(&this->number, data, n);
   n += get_string(&this->ciphertext, data, n);

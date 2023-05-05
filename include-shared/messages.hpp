@@ -62,7 +62,6 @@ struct PublicValue_Message : public Serializable {
 struct Message_Message : public Serializable {
   CryptoPP::SecByteBlock iv;
   CryptoPP::SecByteBlock public_value;
-  CryptoPP::Integer uuid;
   CryptoPP::Integer previous_chain_length;
   CryptoPP::Integer number;
   std::string ciphertext;
