@@ -31,6 +31,8 @@ public:
     CryptoPP::Integer Ns;
     CryptoPP::Integer Nr;
     CryptoPP::Integer PN;
+    SecByteBlock HMACs;
+    SecByteBlock HMACr;
     std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
 };
 
@@ -61,7 +63,6 @@ private:
     std::shared_ptr<CLIDriver> cli_driver;
     std::shared_ptr<CryptoDriver> crypto_driver;
     std::shared_ptr<NetworkDriver> network_driver;
-    SecByteBlock HMAC_key;
 
     // DH Ratchet Fields
     DHParams_Message DH_params;

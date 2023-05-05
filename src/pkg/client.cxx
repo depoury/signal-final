@@ -43,10 +43,11 @@ void Client::prepare_keys(CryptoPP::DH DH_obj,
   this->state.RK = this->crypto_driver->ROOT_update_key(this->state.RK, s);
   if (send) {
     this->state.CKs = this->crypto_driver->CHAIN_generate_key(this->state.RK);
+    this->state.HMACs = this->crypto_driver->HMAC_generate_key(s);
   } else {
     this->state.CKr = this->crypto_driver->CHAIN_generate_key(this->state.RK);
+    this->state.HMACr = this->crypto_driver->HMAC_generate_key(s);
   }
-  this->HMAC_key = this->crypto_driver->HMAC_generate_key(s);
 }
 
 /**
@@ -81,7 +82,7 @@ Message_Message Client::send(std::string plaintext) {
   msg.previous_chain_length = this->state.PN;
   msg.ciphertext = aes.first;
   msg.mac = this->crypto_driver->HMAC_generate(
-      this->HMAC_key,
+      this->state.HMACs,
       concat_msg_fields(
           msg.iv,
           this->DH_current_public_value,
@@ -125,7 +126,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
           std::make_tuple(
               this->DH_last_other_public_value,
               mk,
-              this->HMAC_key
+              this->state.HMACr
               ));
     }
 
@@ -152,11 +153,11 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
           std::make_tuple(
               this->DH_last_other_public_value,
               mk,
-              this->HMAC_key
+              this->state.HMACr
           ));
     }
     AES_key_to_use = this->crypto_driver->AES_generate_key(this->state.CKr);
-    HMAC_key_to_use = this->HMAC_key;
+    HMAC_key_to_use = this->state.HMACr;
     this->state.CKr = this->crypto_driver->CHAIN_update_key(
         this->state.CKr, this->state.RK);
     this->state.Nr++;
