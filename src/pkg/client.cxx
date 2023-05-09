@@ -76,7 +76,7 @@ Message_Message Client::send(std::string plaintext) {
   this->DH_switched = true;
   SecByteBlock mk = this->crypto_driver->AES_generate_key(this->state.CKs);
   this->state.CKs = this->crypto_driver->CHAIN_update_key(
-      this->state.CKs, this->state.RK);
+      this->state.CKs);
   std::pair <std::string, SecByteBlock> aes = this->crypto_driver->AES_encrypt(
       mk, std::move(plaintext));
   Message_Message msg;
@@ -132,7 +132,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
               this->state.HMACr
               ));
       this->state.CKr = this->crypto_driver->CHAIN_update_key(
-          this->state.CKr, this->state.RK);
+          this->state.CKr);
     }
 
     this->state.PN = this->state.Ns;
@@ -159,12 +159,12 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
               this->state.HMACr
           ));
       this->state.CKr = this->crypto_driver->CHAIN_update_key(
-          this->state.CKr, this->state.RK);
+          this->state.CKr);
     }
     AES_key_to_use = this->crypto_driver->AES_generate_key(this->state.CKr);
     HMAC_key_to_use = this->state.HMACr;
     this->state.CKr = this->crypto_driver->CHAIN_update_key(
-        this->state.CKr, this->state.RK);
+        this->state.CKr);
     this->state.Nr++;
   }
 

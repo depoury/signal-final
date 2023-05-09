@@ -78,7 +78,7 @@ SecByteBlock CryptoDriver::DH_generate_shared_key(
  */
 SecByteBlock CryptoDriver::CHAIN_generate_key(const SecByteBlock &ROOT_key)
 {
-    std::string chain_salt_str("chain000");
+    std::string chain_salt_str("roots000");
     SecByteBlock chain_salt((const unsigned char *)(chain_salt_str.data()),
                           chain_salt_str.size());
     SecByteBlock key(ROOT_key.size());
@@ -90,13 +90,16 @@ SecByteBlock CryptoDriver::CHAIN_generate_key(const SecByteBlock &ROOT_key)
     return key;
 }
 
-SecByteBlock CryptoDriver::CHAIN_update_key(const SecByteBlock &Old_CHAIN_key, const SecByteBlock &ROOT_key)
+SecByteBlock CryptoDriver::CHAIN_update_key(const SecByteBlock &Old_CHAIN_key)
 {
-    SecByteBlock key(Old_CHAIN_key.size());
+  std::string chain_salt_str("chain000");
+  SecByteBlock chain_salt((const unsigned char *)(chain_salt_str.data()),
+                          chain_salt_str.size());
+  SecByteBlock key(Old_CHAIN_key.size());
     HKDF<SHA256> hkdf;
     assert(hkdf.DeriveKey(key, key.size(),
                           Old_CHAIN_key, Old_CHAIN_key.size(),
-                          ROOT_key, ROOT_key.size(),
+                          chain_salt, chain_salt.size(),
                           nullptr, 0) > 0);
     return key;
 }
