@@ -106,11 +106,8 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   SecByteBlock HMAC_key_to_use;
   bool located = false;
   if (this->state.MKSKIPPED.count(ciphertext.number)) {
-    this->cli_driver->print_info("Searching historic keys");
-    this->cli_driver->print_info(std::to_string(ciphertext.number.ConvertToLong()));
     for (auto mem : this->state.MKSKIPPED[ciphertext.number]) {
       if (std::get<0>(mem) == ciphertext.public_value) {
-        this->cli_driver->print_info("Found historic key");
         located = true;
         AES_key_to_use = std::get<1>(mem);
         HMAC_key_to_use = std::get<2>(mem);
@@ -119,12 +116,9 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
     }
   }
   if (!located && this->DH_last_other_public_value != ciphertext.public_value) {
-    this->cli_driver->print_info("DH RATCHET!");
     this->DH_switched = false;
     // check if there are missed messages
     while (this->state.Nr < ciphertext.previous_chain_length) {
-      this->cli_driver->print_info("Storing historic key");
-      this->cli_driver->print_info(std::to_string(this->state.Nr.ConvertToLong()));
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
               this->DH_last_other_public_value,
@@ -149,9 +143,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   }
 
   if (!located) {
-    this->cli_driver->print_info("SYMMETRIC RATCHET!");
     while (this->state.Nr < ciphertext.number) {
-      this->cli_driver->print_info("Storing new historic keys");
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
               this->DH_last_other_public_value,
@@ -181,8 +173,6 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
     this->cli_driver->print_info("HMAC verified failed");
     verified = false;
   }
-
-  this->cli_driver->print_info("HMAC VERIFIED " + std::to_string(verified));
 
   return {
       this->crypto_driver->AES_decrypt(
@@ -273,7 +263,6 @@ void Client::HandleKeyExchange(std::string command) {
       this->DH_current_private_value,
       this->DH_last_other_public_value, true);
   this->state.CKr = this->crypto_driver->CHAIN_generate_key(this->state.RK);
-  this->cli_driver->print_info("KEYS EXCHANGED!");
 }
 
 /**
