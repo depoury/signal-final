@@ -146,6 +146,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   }
 
   if (!located) {
+    // there are lost messages in the current chain
     while (this->state.Nr < ciphertext.number) {
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
