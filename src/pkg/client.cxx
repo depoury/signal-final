@@ -32,8 +32,8 @@ Client::Client(std::shared_ptr <NetworkDriver> network_driver,
 /**
  * Generates a new DH secret and replaces the keys. This function should:
  * 1) Call DH_generate_shared_key
- * 2) Use the resulting key in AES_generate_key and HMAC_generate_key
- * 3) Update private key variables
+ * 2) Update root key
+ * 3) Generate encryption and HMAC key
  */
 void Client::prepare_keys(CryptoPP::DH DH_obj,
                           CryptoPP::SecByteBlock DH_private_value,
