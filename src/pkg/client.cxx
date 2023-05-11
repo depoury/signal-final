@@ -104,6 +104,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   std::unique_lock <std::mutex> lck(this->mtx);
   SecByteBlock AES_key_to_use;
   SecByteBlock HMAC_key_to_use;
+  // check if the message is skiped before
   bool located = false;
   if (this->state.MKSKIPPED.count(ciphertext.number)) {
     for (auto mem : this->state.MKSKIPPED[ciphertext.number]) {
@@ -115,6 +116,8 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
       }
     }
   }
+  
+  // the current message is in a new chain.
   if (!located && this->DH_last_other_public_value != ciphertext.public_value) {
     this->DH_switched = false;
     // check if there are missed messages
@@ -128,7 +131,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
       this->state.CKr = this->crypto_driver->CHAIN_update_key(
           this->state.CKr);
     }
-
+    // reset all variables for new receiving chain
     this->state.PN = this->state.Ns;
     this->state.Ns = CryptoPP::Integer::Zero();
     this->state.Nr = CryptoPP::Integer::Zero();
