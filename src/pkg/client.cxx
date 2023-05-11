@@ -104,23 +104,30 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   std::unique_lock <std::mutex> lck(this->mtx);
   SecByteBlock AES_key_to_use;
   SecByteBlock HMAC_key_to_use;
-  // check if the message is skiped before
+  // Check if the message is skipped before
   bool located = false;
   if (this->state.MKSKIPPED.count(ciphertext.number)) {
-    for (auto mem : this->state.MKSKIPPED[ciphertext.number]) {
+    for (size_t i = 0; i < this->state.MKSKIPPED[ciphertext.number].size(); i++) {
+      auto mem = this->state.MKSKIPPED[ciphertext.number][i];
       if (std::get<0>(mem) == ciphertext.public_value) {
         located = true;
         AES_key_to_use = std::get<1>(mem);
         HMAC_key_to_use = std::get<2>(mem);
+        if (this->state.MKSKIPPED[ciphertext.number].size() == 1) {
+          this->state.MKSKIPPED.erase(ciphertext.number);
+        } else {
+          this->state.MKSKIPPED[ciphertext.number].erase(
+              this->state.MKSKIPPED[ciphertext.number].begin() + i);
+        }
         break;
       }
     }
   }
   
-  // the current message is in a new chain.
+  // The current message is in a new chain.
   if (!located && this->DH_last_other_public_value != ciphertext.public_value) {
     this->DH_switched = false;
-    // check if there are missed messages
+    // Check if there are missed messages
     while (this->state.Nr < ciphertext.previous_chain_length) {
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
@@ -131,7 +138,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
       this->state.CKr = this->crypto_driver->CHAIN_update_key(
           this->state.CKr);
     }
-    // reset all variables for new receiving chain
+    // Reset all variables for new receiving chain
     this->state.PN = this->state.Ns;
     this->state.Ns = CryptoPP::Integer::Zero();
     this->state.Nr = CryptoPP::Integer::Zero();
@@ -146,7 +153,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext) 
   }
 
   if (!located) {
-    // there are lost messages in the current chain
+    // There are lost messages in the current chain
     while (this->state.Nr < ciphertext.number) {
       this->state.MKSKIPPED[this->state.Nr++].push_back(
           std::make_tuple(
