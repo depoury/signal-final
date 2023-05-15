@@ -363,7 +363,7 @@ void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params, DH
     this->state.NHKs = initial_HK;
     // Generate initial keys
     this->prepare_keys(
-        std::get<0>(DH_Tuple),
+        dh,
         this->DH_current_private_value,
         this->DH_last_other_public_value, true);
 

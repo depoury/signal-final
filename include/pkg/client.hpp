@@ -57,6 +57,7 @@ public:
     void EvalKeyExchange(std::string command, DHParams_Message DH_params, DH dh, DH dh_rk,
                             SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk, 
                             SecByteBlock rm_pub, SecByteBlock rm_pub_rk);
+    Client_Ratchet_State state;
 
 private:
     void ReceiveThread();
@@ -64,7 +65,6 @@ private:
 
     // wrapper
     void SerializeSend(Serializable *msg);
-    Client_Ratchet_State state;
 
     std::mutex mtx;
 
