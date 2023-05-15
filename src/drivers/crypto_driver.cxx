@@ -223,9 +223,13 @@ std::string CryptoDriver::AES_decrypt(SecByteBlock key, SecByteBlock iv,
     }
     catch (CryptoPP::Exception &e)
     {
+      /*
+        // This is expected to fail in the attempted decryptions of out-of-order headers so we
+        // silence the warning
         std::cerr << e.what() << std::endl;
         std::cerr << "This function was likely called with an incorrect shared key."
                   << std::endl;
+      */
         throw std::runtime_error("CryptoDriver AES decryption failed.");
     }
 }
