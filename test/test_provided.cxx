@@ -277,15 +277,6 @@ TEST_CASE("Missed both sides")
     CHECK(Alice_msg2.compare(tmp.first)==0);
     tmp = Bob.receive(alice_miss_5);
     CHECK(Alice_msg5.compare(tmp.first)==0);
-
-    // std::cout<<"checking alice's missed messages" << std::endl << std::flush;
-    // for (auto skipped : Alice.state.MKSKIPPED)
-    // {
-    //     std::cout<< "N: "<< skipped.first << " , " <<skipped.second.size()<< std::flush;
-    // }
-    // std::cout<< std::endl << std::flush;
-    
-    
     tmp = Alice.receive(bob_miss_1);
     CHECK(Bob_msg1.compare(tmp.first)==0);
     tmp = Alice.receive(bob_miss_3);
