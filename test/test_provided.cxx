@@ -85,7 +85,7 @@ TEST_CASE("Normal message listener first")
 
 
 
-TEST_CASE("Normal message listener first")
+TEST_CASE("Normal message connecter first")
 { 
     std::shared_ptr<NetworkDriver> network_driver =
         std::make_shared<NetworkDriverImpl>();
