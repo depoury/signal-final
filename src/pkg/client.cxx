@@ -180,7 +180,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
                     this->DH_last_other_public_value,
                     this->crypto_driver->AES_generate_key(this->state.CKr),
                     this->state.HMACr,
-                    this->state.NHKr));
+                    this->state.HKr));
             this->state.CKr = this->crypto_driver->CHAIN_update_key(
                 this->state.CKr);
         }
@@ -222,7 +222,6 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     bool verified = true;
     try
     {
-
         this->crypto_driver->HMAC_verify(
             HMAC_key_to_use,
             concat_msg_fields(
@@ -234,7 +233,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     catch (std::runtime_error &e)
     {
         this->cli_driver->print_info("HMAC verified failed");
-        verified = false;
+        return {"", false};
     }
 
     return {

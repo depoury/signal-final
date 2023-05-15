@@ -269,11 +269,21 @@ TEST_CASE("Missed both sides")
     std::string Bob_msg5 = "Missed 5";
     Message_Message bob_miss_5 = Bob.send(Bob_msg5);
 
+    std::string Bob_msg6 = "Normal 6";
+    tmp = Alice.receive(Bob.send(Bob_msg6));
+    CHECK(Bob_msg6.compare(tmp.first)==0);
 
     tmp = Bob.receive(alice_miss_2);
     CHECK(Alice_msg2.compare(tmp.first)==0);
     tmp = Bob.receive(alice_miss_5);
     CHECK(Alice_msg5.compare(tmp.first)==0);
+
+    // std::cout<<"checking alice's missed messages" << std::endl << std::flush;
+    // for (auto skipped : Alice.state.MKSKIPPED)
+    // {
+    //     std::cout<< "N: "<< skipped.first << " , " <<skipped.second.size()<< std::flush;
+    // }
+    // std::cout<< std::endl << std::flush;
     
     
     tmp = Alice.receive(bob_miss_1);
@@ -282,4 +292,117 @@ TEST_CASE("Missed both sides")
     CHECK(Bob_msg3.compare(tmp.first)==0);
     tmp = Alice.receive(bob_miss_5);
     CHECK(Bob_msg5.compare(tmp.first)==0);
+}
+
+
+
+TEST_CASE("Basic header security")
+{ 
+    std::shared_ptr<NetworkDriver> network_driver =
+        std::make_shared<NetworkDriverImpl>();
+    std::shared_ptr<CryptoDriver> crypto_driver =
+        std::make_shared<CryptoDriver>();
+
+    // Create client then run network, crypto, and cli.
+    Client Alice = Client(network_driver, crypto_driver);
+    Client Bob = Client(network_driver, crypto_driver);
+    Client Charlie = Client(network_driver, crypto_driver);
+
+    DHParams_Message DH_params = crypto_driver->DH_generate_params();
+    auto [dh_obj, alice_prv, alice_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [dh_obj2, bob_prv, bob_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh, alice_rk_prv, alice_rk_pub] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh2, bob_rk_prv, bob_rk_pub] = crypto_driver->DH_initialize(DH_params);
+
+    auto [dh_obj3, charlie_prv, charlie_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh3, charlie_rk_prv, charlie_rk_pub] = crypto_driver->DH_initialize(DH_params);
+
+    Alice.EvalKeyExchange("listen", DH_params, dh_obj, rk_dh, alice_prv, alice_ppk, alice_rk_prv, alice_rk_pub,
+                          bob_ppk, bob_rk_pub);
+    Bob.EvalKeyExchange("connect", DH_params, dh_obj2, rk_dh2, bob_prv, bob_ppk, bob_rk_prv, bob_rk_pub,
+                        alice_ppk, alice_rk_pub);
+    Charlie.EvalKeyExchange("connect", DH_params, dh_obj3, rk_dh3, charlie_prv, charlie_ppk, charlie_rk_prv, charlie_rk_pub,
+                        alice_ppk, alice_rk_pub);
+
+    std::pair<std::string, bool> tmp;
+
+    std::string Alice_msg1 = "Normal 1";
+    tmp = Bob.receive(Alice.send(Alice_msg1));
+    CHECK(Alice_msg1.compare(tmp.first)==0);
+
+    std::string Alice_msg2 = "Normal 2";
+    tmp = Bob.receive(Alice.send(Alice_msg2));
+    CHECK(Alice_msg2.compare(tmp.first)==0);
+
+    std::string Bob_msg1= "Normal 1";
+    tmp = Alice.receive(Bob.send(Bob_msg1));
+    CHECK(Bob_msg1.compare(tmp.first)==0);
+
+    std::string Bob_msg2 = "Normal 2";
+    tmp = Alice.receive(Bob.send(Bob_msg2));
+    CHECK(Bob_msg2.compare(tmp.first)==0);
+
+    std::string Charlie_msg1 = "Attack 1";
+    tmp = Alice.receive(Charlie.send(Charlie_msg1));
+    CHECK(tmp.second==false);
+}
+
+
+TEST_CASE("Basic DH security")
+{ 
+    std::shared_ptr<NetworkDriver> network_driver =
+        std::make_shared<NetworkDriverImpl>();
+    std::shared_ptr<CryptoDriver> crypto_driver =
+        std::make_shared<CryptoDriver>();
+
+    // Create client then run network, crypto, and cli.
+    Client Alice = Client(network_driver, crypto_driver);
+    Client Bob = Client(network_driver, crypto_driver);
+    Client Charlie = Client(network_driver, crypto_driver);
+
+    DHParams_Message DH_params = crypto_driver->DH_generate_params();
+    auto [dh_obj, alice_prv, alice_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [dh_obj2, bob_prv, bob_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh, alice_rk_prv, alice_rk_pub] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh2, bob_rk_prv, bob_rk_pub] = crypto_driver->DH_initialize(DH_params);
+
+    auto [dh_obj3, charlie_prv, charlie_ppk] = crypto_driver->DH_initialize(DH_params);
+    auto [rk_dh3, charlie_rk_prv, charlie_rk_pub] = crypto_driver->DH_initialize(DH_params);
+
+    Alice.EvalKeyExchange("listen", DH_params, dh_obj, rk_dh, alice_prv, alice_ppk, alice_rk_prv, alice_rk_pub,
+                          bob_ppk, bob_rk_pub);
+    Bob.EvalKeyExchange("connect", DH_params, dh_obj2, rk_dh2, bob_prv, bob_ppk, bob_rk_prv, bob_rk_pub,
+                        alice_ppk, alice_rk_pub);
+    Charlie.EvalKeyExchange("connect", DH_params, dh_obj3, rk_dh3, charlie_prv, charlie_ppk, alice_rk_prv, alice_rk_pub,
+                        bob_ppk, bob_rk_pub);
+
+    std::pair<std::string, bool> tmp;
+
+    std::string Bob_msg1= "Normal 1";
+    tmp = Alice.receive(Bob.send(Bob_msg1));
+    CHECK(Bob_msg1.compare(tmp.first)==0);
+
+    std::string Bob_msg2 = "Miss 2";
+    Message_Message bob_miss_2 = Bob.send(Bob_msg2);
+
+    std::string Alice_msg1 = "Normal 1";
+    tmp = Bob.receive(Alice.send(Alice_msg1));
+    CHECK(Alice_msg1.compare(tmp.first)==0);
+
+    std::string Alice_msg2 = "Normal 2";
+    tmp = Bob.receive(Alice.send(Alice_msg2));
+    CHECK(Alice_msg2.compare(tmp.first)==0);
+
+    std::string Bob_msg3 = "Normal 3";
+    tmp = Alice.receive(Bob.send(Bob_msg3));
+    CHECK(Bob_msg3.compare(tmp.first)==0);
+
+    Message_Message Charlie_attack1 = Charlie.send("Attack 1");
+    Message_Message Charlie_attack2 = Charlie.send("Attack 2");
+
+    tmp = Alice.receive(Charlie_attack1);
+    CHECK(tmp.second==false);
+
+    tmp = Alice.receive(Charlie_attack2);
+    CHECK(tmp.second==false);
 }
