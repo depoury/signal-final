@@ -81,7 +81,6 @@ std::pair<Header_Message, bool> Client::decryptHeader(const Message_Message &cip
     }
     catch (std::runtime_error &_)
     {
-        // this->cli_driver->print_info("aec header attemp failed");
         return {header, false};
     }
     header.deserialize(header_data);
@@ -100,13 +99,6 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     Header_Message header;
     SecByteBlock AES_key_to_use;
     SecByteBlock HMAC_key_to_use;
-
-    // this->cli_driver->print_success("HK:");
-    // this->cli_driver->print_success(byteblock_to_string(this->state.HKr));
-    // this->cli_driver->print_success("NHK:");
-    // this->cli_driver->print_success(byteblock_to_string(this->state.NHKr));
-    // this->cli_driver->print_success("header pub:");
-    // this->cli_driver->print_success(byteblock_to_string(header.public_value));
 
     // try to decrypt header
     bool header_decrypted = false;
@@ -143,7 +135,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     }
     if (!header_decrypted)
     {
-        this->cli_driver->print_warning("Header verified failed");
+        this->cli_driver->print_warning("Header Verification Failed");
         return {"", false};
     }
 
@@ -232,7 +224,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     }
     catch (std::runtime_error &e)
     {
-        this->cli_driver->print_info("HMAC verified failed");
+        this->cli_driver->print_info("HMAC Verification Failed");
         return {"", false};
     }
 
@@ -345,7 +337,7 @@ void Client::HandleKeyExchange(std::string command)
 
 
 void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params, DH dh, DH dh_rk,
-                            SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk, 
+                            SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk,
                             SecByteBlock rm_pub, SecByteBlock rm_pub_rk)
 {
     // synchronize DH params
@@ -499,20 +491,6 @@ Message_Message Client::send(std::string plaintext)
     msg.iv = content_aes.second;
     msg.ciphertext_H = header_aes.first;
     msg.iv_H = header_aes.second;
-
-    // this->cli_driver->print_success("HK:");
-    // this->cli_driver->print_success(byteblock_to_string(this->state.HKs));
-    // this->cli_driver->print_success("header pub:");
-    // this->cli_driver->print_success(byteblock_to_string(this->DH_current_public_value));
-
-    // this->cli_driver->print_success("HMAC key:");
-    // this->cli_driver->print_success(byteblock_to_string(this->state.HMACs));
-    // this->cli_driver->print_success("cat fields:");
-    // this->cli_driver->print_success(std::to_string(concat_msg_fields(
-    //             msg.iv,
-    //             this->DH_current_public_value,
-    //             msg.ciphertext).size()));
-
     msg.mac = this->crypto_driver->HMAC_generate(
         this->state.HMACs,
         concat_msg_fields(
