@@ -36,6 +36,7 @@ public:
   SecByteBlock CHAIN_generate_key(const SecByteBlock &ROOT_key);
   SecByteBlock CHAIN_update_key(const SecByteBlock &Old_CHAIN_key);
   SecByteBlock ROOT_update_key(const SecByteBlock &Old_ROOT_key, const SecByteBlock &DH_shared);
+  SecByteBlock HEADER_update_key(const SecByteBlock &ROOT_key);
   SecByteBlock AES_generate_key(const SecByteBlock &CHAIN_key);
   std::pair<std::string, SecByteBlock> AES_encrypt(SecByteBlock key,
                                                    std::string plaintext);

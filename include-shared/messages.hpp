@@ -59,12 +59,21 @@ struct PublicValue_Message : public Serializable {
   int deserialize(std::vector<unsigned char> &data);
 };
 
-struct Message_Message : public Serializable {
-  CryptoPP::SecByteBlock iv;
+struct Header_Message : public Serializable {
   CryptoPP::SecByteBlock public_value;
+  CryptoPP::SecByteBlock trail;
   CryptoPP::Integer previous_chain_length;
   CryptoPP::Integer number;
+
+  void serialize(std::vector<unsigned char> &data);
+  int deserialize(std::vector<unsigned char> &data);
+};
+
+struct Message_Message : public Serializable {
   std::string ciphertext;
+  CryptoPP::SecByteBlock iv;
+  std::string ciphertext_H;
+  CryptoPP::SecByteBlock iv_H;
   std::string mac;
 
   void serialize(std::vector<unsigned char> &data);

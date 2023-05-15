@@ -80,7 +80,7 @@ SecByteBlock CryptoDriver::CHAIN_generate_key(const SecByteBlock &ROOT_key)
 {
     std::string chain_salt_str("roots000");
     SecByteBlock chain_salt((const unsigned char *)(chain_salt_str.data()),
-                          chain_salt_str.size());
+                            chain_salt_str.size());
     SecByteBlock key(ROOT_key.size());
     HKDF<SHA256> hkdf;
     assert(hkdf.DeriveKey(key, key.size(),
@@ -92,10 +92,10 @@ SecByteBlock CryptoDriver::CHAIN_generate_key(const SecByteBlock &ROOT_key)
 
 SecByteBlock CryptoDriver::CHAIN_update_key(const SecByteBlock &Old_CHAIN_key)
 {
-  std::string chain_salt_str("chain000");
-  SecByteBlock chain_salt((const unsigned char *)(chain_salt_str.data()),
-                          chain_salt_str.size());
-  SecByteBlock key(Old_CHAIN_key.size());
+    std::string chain_salt_str("chain000");
+    SecByteBlock chain_salt((const unsigned char *)(chain_salt_str.data()),
+                            chain_salt_str.size());
+    SecByteBlock key(Old_CHAIN_key.size());
     HKDF<SHA256> hkdf;
     assert(hkdf.DeriveKey(key, key.size(),
                           Old_CHAIN_key, Old_CHAIN_key.size(),
@@ -113,9 +113,21 @@ SecByteBlock CryptoDriver::ROOT_update_key(const SecByteBlock &Old_ROOT_key, con
                           DH_shared, DH_shared.size(),
                           nullptr, 0) > 0);
     return key;
-
 }
 
+SecByteBlock CryptoDriver::HEADER_update_key(const SecByteBlock &ROOT_key)
+{
+    std::string header_salt_str("header00");
+    SecByteBlock header_salt((const unsigned char *)(header_salt_str.data()),
+                            header_salt_str.size());
+    SecByteBlock key(AES::DEFAULT_KEYLENGTH);
+    HKDF<SHA256> hkdf;
+    assert(hkdf.DeriveKey(key, key.size(),
+                          ROOT_key, ROOT_key.size(),
+                          header_salt, header_salt.size(),
+                          nullptr, 0) > 0);
+    return key;
+}
 /**
  * @brief Updates Chain key using HKDR with a salt. This function should
  * 1) Allocate a `SecByteBlock` of size `AES::DEFAULT_KEYLENGTH`.

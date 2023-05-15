@@ -31,9 +31,13 @@ public:
     CryptoPP::Integer Ns;
     CryptoPP::Integer Nr;
     CryptoPP::Integer PN;
+    SecByteBlock HKs;
+    SecByteBlock HKr;
+    SecByteBlock NHKs;
+    SecByteBlock NHKr;
     SecByteBlock HMACs;
     SecByteBlock HMACr;
-    std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
+    std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
 };
 
 class Client
@@ -46,6 +50,7 @@ public:
                       CryptoPP::SecByteBlock DH_other_public_value,
                       bool send);
     Message_Message send(std::string plaintext);
+    std::pair<Header_Message, bool> decryptHeader(const Message_Message &ciphertext, SecByteBlock header_key);
     std::pair<std::string, bool> receive(const Message_Message &ciphertext);
     void run(std::string command);
     void HandleKeyExchange(std::string command);
