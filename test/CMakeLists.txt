@@ -4,7 +4,7 @@ cmake_minimum_required(VERSION 3.14)
 if ( "$ENV{CS1515_TA_MODE}" STREQUAL "on" )
     set(TESTFILES network_driver.cxx test_provided.cxx test.cxx)
 else()
-    set(TESTFILES test_exchange.cxx)
+    set(TESTFILES test_provided.cxx)
 endif()
 
 set(TEST_MAIN unit_tests)   # Default name for test executable (change if you wish).
