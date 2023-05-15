@@ -101,6 +101,13 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     SecByteBlock AES_key_to_use;
     SecByteBlock HMAC_key_to_use;
 
+    this->cli_driver->print_success("HK:");
+    this->cli_driver->print_success(byteblock_to_string(this->state.HKr));
+    this->cli_driver->print_success("NHK:");
+    this->cli_driver->print_success(byteblock_to_string(this->state.NHKr));
+    this->cli_driver->print_success("header pub:");
+    // this->cli_driver->print_success(byteblock_to_string(header.public_value));
+
     // try to decrypt header
     bool header_decrypted = false;
     std::tie(header, header_decrypted) = this->decryptHeader(ciphertext, this->state.HKr);
@@ -215,21 +222,6 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     bool verified = true;
     try
     {
-        this->cli_driver->print_success("MK:");
-        this->cli_driver->print_success(byteblock_to_string(AES_key_to_use));
-        this->cli_driver->print_success("IV:");
-        this->cli_driver->print_success(byteblock_to_string(ciphertext.iv));
-        this->cli_driver->print_success("ciphertext:");
-        this->cli_driver->print_success(ciphertext.ciphertext);
-        this->cli_driver->print_success("header pub:");
-        this->cli_driver->print_success(byteblock_to_string(header.public_value));
-        // this->cli_driver->print_success("HMAC key:");
-        // this->cli_driver->print_success(byteblock_to_string(HMAC_key_to_use));
-        // this->cli_driver->print_success("cat fields:");
-        // this->cli_driver->print_success(std::to_string(concat_msg_fields(
-        //         ciphertext.iv,
-        //         header.public_value,
-        //         ciphertext.ciphertext).size()));
 
         this->crypto_driver->HMAC_verify(
             HMAC_key_to_use,
@@ -348,6 +340,61 @@ void Client::HandleKeyExchange(std::string command)
     this->state.HKr = initial_HK;
     this->state.HKs = initial_HK;
     this->state.NHKr = initial_HK;
+    this->state.NHKs = initial_HK;
+    // this->state.NHKs = this->crypto_driver->HEADER_update_key(this->state.RK);
+}
+
+
+void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params)
+{
+    // synchronize DH params
+    this->DH_switched = std::equal(command.begin(), command.end(), "connect");
+    this->DH_params = DH_params;
+    
+    // DH exchange
+    std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
+    this->DH_current_private_value = std::get<1>(DH_Tuple);
+    this->DH_current_public_value = std::get<2>(DH_Tuple);
+
+    PublicValue_Message pub_key_msg;
+    pub_key_msg.public_value = this->DH_current_public_value;
+    this->SerializeSend(&pub_key_msg);
+
+    std::vector<unsigned char> their_pub_key_msg = this->network_driver->read();
+    if (get_message_type(their_pub_key_msg) != MessageType::PublicValue)
+        throw std::runtime_error("HandleKeyExchange - Listener Expected a PublicValue");
+    PublicValue_Message their_pub_key;
+    their_pub_key.deserialize(their_pub_key_msg);
+    this->DH_last_other_public_value = their_pub_key.public_value;
+
+    // Handle RK generation
+    auto [rk_dh, rk_private, rk_public] = this->crypto_driver->DH_initialize(this->DH_params);
+    PublicValue_Message rk_pub_key_msg;
+    rk_pub_key_msg.public_value = rk_public;
+    this->SerializeSend(&rk_pub_key_msg);
+
+    PublicValue_Message their_rk_pub_key;
+    std::vector<unsigned char> their_rk_pub_key_msg = this->network_driver->read();
+    if (get_message_type(their_rk_pub_key_msg) != MessageType::PublicValue)
+        throw std::runtime_error("HandleKeyExchangeRK - Listener Expected a PublicValue");
+    their_rk_pub_key.deserialize(their_rk_pub_key_msg);
+
+    this->state.RK = this->crypto_driver->DH_generate_shared_key(rk_dh, rk_private, their_rk_pub_key.public_value);
+
+    // initial header key from first root key
+    SecByteBlock initial_HK = this->crypto_driver->HEADER_update_key(this->state.RK);
+    this->state.NHKs = initial_HK;
+    // Generate initial keys
+    this->prepare_keys(
+        std::get<0>(DH_Tuple),
+        this->DH_current_private_value,
+        this->DH_last_other_public_value, true);
+
+    this->state.CKr = this->crypto_driver->CHAIN_generate_key(this->state.RK);
+    this->state.HKr = initial_HK;
+    this->state.HKs = initial_HK;
+    this->state.NHKr = initial_HK;
+    this->state.NHKs = initial_HK;
     // this->state.NHKs = this->crypto_driver->HEADER_update_key(this->state.RK);
 }
 
@@ -478,12 +525,8 @@ Message_Message Client::send(std::string plaintext)
     msg.ciphertext_H = header_aes.first;
     msg.iv_H = header_aes.second;
 
-    this->cli_driver->print_success("MK:");
-    this->cli_driver->print_success(byteblock_to_string(message_key));
-    this->cli_driver->print_success("IV:");
-    this->cli_driver->print_success(byteblock_to_string(msg.iv));
-    this->cli_driver->print_success("ciphertext:");
-    this->cli_driver->print_success(msg.ciphertext);
+    this->cli_driver->print_success("HK:");
+    this->cli_driver->print_success(byteblock_to_string(this->state.HKs));
     this->cli_driver->print_success("header pub:");
     this->cli_driver->print_success(byteblock_to_string(this->DH_current_public_value));
 
