@@ -54,6 +54,9 @@ public:
     std::pair<std::string, bool> receive(const Message_Message &ciphertext);
     void run(std::string command);
     void HandleKeyExchange(std::string command);
+    void EvalKeyExchange(std::string command, DHParams_Message DH_params, DH dh, DH dh_rk,
+                            SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk, 
+                            SecByteBlock rm_pub, SecByteBlock rm_pub_rk);
 
 private:
     void ReceiveThread();

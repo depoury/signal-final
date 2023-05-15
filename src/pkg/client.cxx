@@ -345,42 +345,19 @@ void Client::HandleKeyExchange(std::string command)
 }
 
 
-void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params)
+void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params, DH dh, DH dh_rk,
+                            SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk, 
+                            SecByteBlock rm_pub, SecByteBlock rm_pub_rk)
 {
     // synchronize DH params
     this->DH_switched = std::equal(command.begin(), command.end(), "connect");
     this->DH_params = DH_params;
-    
-    // DH exchange
-    std::tuple<DH, SecByteBlock, SecByteBlock> DH_Tuple = this->crypto_driver->DH_initialize(this->DH_params);
-    this->DH_current_private_value = std::get<1>(DH_Tuple);
-    this->DH_current_public_value = std::get<2>(DH_Tuple);
 
-    PublicValue_Message pub_key_msg;
-    pub_key_msg.public_value = this->DH_current_public_value;
-    this->SerializeSend(&pub_key_msg);
-
-    std::vector<unsigned char> their_pub_key_msg = this->network_driver->read();
-    if (get_message_type(their_pub_key_msg) != MessageType::PublicValue)
-        throw std::runtime_error("HandleKeyExchange - Listener Expected a PublicValue");
-    PublicValue_Message their_pub_key;
-    their_pub_key.deserialize(their_pub_key_msg);
-    this->DH_last_other_public_value = their_pub_key.public_value;
-
+    this->DH_current_private_value = prv;
+    this->DH_current_public_value = pub;
+    this->DH_last_other_public_value = rm_pub;
     // Handle RK generation
-    auto [rk_dh, rk_private, rk_public] = this->crypto_driver->DH_initialize(this->DH_params);
-    PublicValue_Message rk_pub_key_msg;
-    rk_pub_key_msg.public_value = rk_public;
-    this->SerializeSend(&rk_pub_key_msg);
-
-    PublicValue_Message their_rk_pub_key;
-    std::vector<unsigned char> their_rk_pub_key_msg = this->network_driver->read();
-    if (get_message_type(their_rk_pub_key_msg) != MessageType::PublicValue)
-        throw std::runtime_error("HandleKeyExchangeRK - Listener Expected a PublicValue");
-    their_rk_pub_key.deserialize(their_rk_pub_key_msg);
-
-    this->state.RK = this->crypto_driver->DH_generate_shared_key(rk_dh, rk_private, their_rk_pub_key.public_value);
-
+    this->state.RK = this->crypto_driver->DH_generate_shared_key(dh_rk, prv_rk, rm_pub_rk);
     // initial header key from first root key
     SecByteBlock initial_HK = this->crypto_driver->HEADER_update_key(this->state.RK);
     this->state.NHKs = initial_HK;
@@ -395,7 +372,6 @@ void Client::EvalKeyExchange(std::string command, DHParams_Message DH_params)
     this->state.HKs = initial_HK;
     this->state.NHKr = initial_HK;
     this->state.NHKs = initial_HK;
-    // this->state.NHKs = this->crypto_driver->HEADER_update_key(this->state.RK);
 }
 
 /**
