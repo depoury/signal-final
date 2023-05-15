@@ -10,6 +10,8 @@
 #include <crypto++/hex.h>
 #include <crypto++/integer.h>
 
+#define HEADER_TAG_LENGTH 16
+
 // String <=> Vec<char>.
 std::string chvec2str(std::vector<unsigned char> data);
 std::vector<unsigned char> str2chvec(std::string s);
@@ -30,3 +32,10 @@ void print_key_as_hex(const CryptoPP::SecByteBlock &block);
 std::string concat_msg_fields(CryptoPP::SecByteBlock iv,
                               CryptoPP::SecByteBlock public_value,
                               std::string ciphertext);
+
+
+std::string concat_msg_fields(CryptoPP::SecByteBlock iv,
+                              CryptoPP::SecByteBlock iv_H,
+                              CryptoPP::SecByteBlock public_value,
+                              std::string ciphertext,
+                              std::string ciphertext_H);

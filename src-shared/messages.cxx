@@ -127,6 +127,43 @@ int PublicValue_Message::deserialize(std::vector<unsigned char> &data) {
 /**
  * Serialize Message.
  */
+void Header_Message::serialize(std::vector<unsigned char> &data) {
+  // Add message type.
+  data.push_back((char)MessageType::Message);
+
+  // Add fields.
+  std::string public_integer = byteblock_to_string(this->public_value);
+  put_string(public_integer, data);
+  std::string trail_integer = byteblock_to_string(this->trail);
+  put_string(trail_integer, data);
+  put_integer(this->previous_chain_length, data);
+  put_integer(this->number, data);
+}
+
+/**
+ * Deserialize Message.
+ */
+int Header_Message::deserialize(std::vector<unsigned char> &data) {
+  // Check correct message type.
+  assert(get_message_type(data) == MessageType::Message);
+
+  // Get fields.
+  int n = 1;
+  std::string public_integer;
+  n += get_string(&public_integer, data, n);
+  this->public_value = string_to_byteblock(public_integer);
+  std::string trail_integer;
+  n += get_string(&trail_integer, data, n);
+  this->trail = string_to_byteblock(trail_integer);
+  n += get_integer(&this->previous_chain_length, data, n);
+  n += get_integer(&this->number, data, n);
+  return n;
+}
+
+
+/**
+ * Serialize Message.
+ */
 void Message_Message::serialize(std::vector<unsigned char> &data) {
   // Add message type.
   data.push_back((char)MessageType::Message);
@@ -134,11 +171,10 @@ void Message_Message::serialize(std::vector<unsigned char> &data) {
   // Add fields.
   std::string iv = byteblock_to_string(this->iv);
   put_string(iv, data);
-  std::string public_integer = byteblock_to_string(this->public_value);
-  put_string(public_integer, data);
-  put_integer(this->previous_chain_length, data);
-  put_integer(this->number, data);
+  std::string iv_H = byteblock_to_string(this->iv_H);
+  put_string(iv_H, data);
   put_string(this->ciphertext, data);
+  put_string(this->ciphertext_H, data);
   put_string(this->mac, data);
 }
 
@@ -154,12 +190,11 @@ int Message_Message::deserialize(std::vector<unsigned char> &data) {
   std::string iv;
   n += get_string(&iv, data, n);
   this->iv = string_to_byteblock(iv);
-  std::string public_integer;
-  n += get_string(&public_integer, data, n);
-  this->public_value = string_to_byteblock(public_integer);
-  n += get_integer(&this->previous_chain_length, data, n);
-  n += get_integer(&this->number, data, n);
+  std::string iv_H;
+  n += get_string(&iv_H, data, n);
+  this->iv_H = string_to_byteblock(iv_H);
   n += get_string(&this->ciphertext, data, n);
+  n += get_string(&this->ciphertext_H, data, n);
   n += get_string(&this->mac, data, n);
   return n;
 }

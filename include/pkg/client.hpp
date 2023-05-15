@@ -31,9 +31,13 @@ public:
     CryptoPP::Integer Ns;
     CryptoPP::Integer Nr;
     CryptoPP::Integer PN;
+    SecByteBlock HKs;
+    SecByteBlock HKr;
+    SecByteBlock NHKs;
+    SecByteBlock NHKr;
     SecByteBlock HMACs;
     SecByteBlock HMACr;
-    std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
+    std::map<CryptoPP::Integer, std::vector<std::tuple<SecByteBlock, SecByteBlock, SecByteBlock, SecByteBlock>>> MKSKIPPED;
 };
 
 class Client
@@ -46,9 +50,14 @@ public:
                       CryptoPP::SecByteBlock DH_other_public_value,
                       bool send);
     Message_Message send(std::string plaintext);
+    std::pair<Header_Message, bool> decryptHeader(const Message_Message &ciphertext, SecByteBlock header_key);
     std::pair<std::string, bool> receive(const Message_Message &ciphertext);
     void run(std::string command);
     void HandleKeyExchange(std::string command);
+    void EvalKeyExchange(std::string command, DHParams_Message DH_params, DH dh, DH dh_rk,
+                            SecByteBlock prv, SecByteBlock pub, SecByteBlock prv_rk, SecByteBlock pub_rk, 
+                            SecByteBlock rm_pub, SecByteBlock rm_pub_rk);
+    Client_Ratchet_State state;
 
 private:
     void ReceiveThread();
@@ -56,7 +65,6 @@ private:
 
     // wrapper
     void SerializeSend(Serializable *msg);
-    Client_Ratchet_State state;
 
     std::mutex mtx;
 
