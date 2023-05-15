@@ -81,7 +81,7 @@ std::pair<Header_Message, bool> Client::decryptHeader(const Message_Message &cip
     }
     catch (std::runtime_error &_)
     {
-        this->cli_driver->print_info("aec header failed");
+        // this->cli_driver->print_info("aec header attemp failed");
         return {header, false};
     }
     header.deserialize(header_data);
@@ -101,11 +101,11 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     SecByteBlock AES_key_to_use;
     SecByteBlock HMAC_key_to_use;
 
-    this->cli_driver->print_success("HK:");
-    this->cli_driver->print_success(byteblock_to_string(this->state.HKr));
-    this->cli_driver->print_success("NHK:");
-    this->cli_driver->print_success(byteblock_to_string(this->state.NHKr));
-    this->cli_driver->print_success("header pub:");
+    // this->cli_driver->print_success("HK:");
+    // this->cli_driver->print_success(byteblock_to_string(this->state.HKr));
+    // this->cli_driver->print_success("NHK:");
+    // this->cli_driver->print_success(byteblock_to_string(this->state.NHKr));
+    // this->cli_driver->print_success("header pub:");
     // this->cli_driver->print_success(byteblock_to_string(header.public_value));
 
     // try to decrypt header
@@ -144,7 +144,7 @@ std::pair<std::string, bool> Client::receive(const Message_Message &ciphertext)
     if (!header_decrypted)
     {
         this->cli_driver->print_warning("Header verified failed");
-        throw std::runtime_error("Receive - No keys to decrypt the current header");
+        return {"", false};
     }
 
     // Check if the message is skipped before
@@ -501,10 +501,10 @@ Message_Message Client::send(std::string plaintext)
     msg.ciphertext_H = header_aes.first;
     msg.iv_H = header_aes.second;
 
-    this->cli_driver->print_success("HK:");
-    this->cli_driver->print_success(byteblock_to_string(this->state.HKs));
-    this->cli_driver->print_success("header pub:");
-    this->cli_driver->print_success(byteblock_to_string(this->DH_current_public_value));
+    // this->cli_driver->print_success("HK:");
+    // this->cli_driver->print_success(byteblock_to_string(this->state.HKs));
+    // this->cli_driver->print_success("header pub:");
+    // this->cli_driver->print_success(byteblock_to_string(this->DH_current_public_value));
 
     // this->cli_driver->print_success("HMAC key:");
     // this->cli_driver->print_success(byteblock_to_string(this->state.HMACs));
